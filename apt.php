@@ -9,25 +9,33 @@ class APT
 	function available() {
 		$this->policy();
 		$versions = array_splice(&$this->res, 3);
-		//print_r($versions);
+		print_r($versions);
 		array_shift($versions);
 		//$pat = '\d+\.\d+.*\-.*';
-		$pat = "/(\d+)\-(.*)/";
-		$pat_repo = "/\d\d\d http.*/";
+		$pat = "/^([\d|\.]+)\-(.*)/";
+		$pat_repo = "/\w*(\d\d\d) (http.*|\/var.*)/";
 
 		foreach ($versions as $line) {
-			print($line);
+			//echo "X".$line."X \n";
+			$line_tr = trim($line);
+			echo $line_tr."\n";
 
-			if (preg_split($pat_repo, $line)) {
+			if (preg_match($pat_repo, $line)) {
+				//echo "repo!\n";
 				continue;
 			}
-			if (substr($line,0,3) == '***' ) {
-				// installed
-				$line = substr($line, 3);
-			}
+			//echo substr(trim($line),0,3)."\n"; // == '***' ) {
 
-			if ( $res = preg_split( $pat, $line) ) {
-				echo "$line ";
+			if (substr($line_tr,0,3) == '***' ) {
+				// installed
+				$line_tr = substr($line_tr, 3);
+				echo "DEFAULT\n";
+			}
+			$matches = array();
+			if ( $res = preg_match( $pat, $line_tr, &$matches) ) {
+				//echo "$line_tr \n";
+				if ($matches );
+				print_r($matches);
 
 				//print_r($res);
 			}
