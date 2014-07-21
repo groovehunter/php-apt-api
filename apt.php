@@ -6,6 +6,17 @@ class APT
 {
 
 
+	function work() {
+		if ($this->ssh) {
+			$this->execute_ssh();
+		} else {
+			// local execution with sudo
+			$this->cmd = 'sudo '.$this->cmd;
+			$this->execute_local();
+		}
+	}
+
+
 	function available() {
 		$this->policy();
 		$versions = array_splice(&$this->res, 3);
@@ -44,17 +55,72 @@ class APT
 		}
 	}
 
-	function policy() {
-		$this->cmd = 'sudo apt-cache policy '.$this->pkg ;
-		$this->execute();
-		//$res = proc_open($cmd);
+
+
+	function depends() {
+		$this->cmd = 'apt-cache depends '.$this->pkg ;
+		$this->work();
+		array_shift($this->res);
+		$res = $this->res;
+		$info = array();
+		foreach ($res as $line) {
+			if (substr(trim($line),0,7) == 'Depends') {
+				$info[] = $line;
+			} else {
+				// needed?
+			}
+		}
+		$this->out = $info;
 	}
 
-	function execute() {
+
+	function policy() {
+		$this->cmd = 'apt-cache policy '.$this->pkg ;
+		$this->work();
+
+	}
+
+	function execute_local() {
 		$output = array();
 		$res = exec( $this->cmd, &$output, &$return );
 		$this->res = $output;
 		//print_r( $this->res );
+	}
+
+
+	function execute_ssh() {
+		$dlog = fopen('/tmp/phplog','a');
+		$this->res = 'NO DATA';
+		//$pass = file_get_contents('.secret');
+		$pass = trim(file_get_contents('/var/www/tests/buh/sites/all/modules/apt_api/includes/php-apt-api/.secret'));
+		if (!function_exists("ssh2_connect")) die("function ssh2_connect doesn't exist");
+		// log in at server1.example.com on port 22
+		if(!($con = ssh2_connect($this->host, 22))){
+				fwrite($dlog, "fail: unable to establish connection\n");
+		} else {
+				// try to authenticate with username root, password secretpassword
+				if(!ssh2_auth_password($con, "root", $pass)) {
+						fwrite($dlog, "fail: unable to authenticate\n");
+				} else {
+						// allright, we're in!
+						fwrite($dlog, "okay: logged in...\n" );
+
+						// execute a command
+						if (!($stream = ssh2_exec($con, $this->cmd ))) {
+								fwrite($dlog, "fail: unable to execute command\n");
+						} else {
+								// collect returning data from command
+								stream_set_blocking($stream, true);
+								$data = "";
+								while ($buf = fread($stream,4096)) {
+										$data .= $buf;
+								}
+								fclose($stream);
+								//fwrite($dlog, $data);
+								$this->res = explode('\n',$data);
+						}
+				}
+		}
 	}
 
 }
@@ -67,6 +133,7 @@ function test($a) {
 	//$apt->policy();
 	$apt->available();
 }
+
 
 
 //test($argv);
